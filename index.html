@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Margin Rate Variance Dashboard</title>
+  <style>
+/* =============================
+   Design Tokens — McKinsey Navy
+============================= */
+:root {
+  --c-navy:        #0A2342;
+  --c-navy-mid:    #1A3A5C;
+  --c-slate:       #2C3E50;
+  --c-mid-gray:    #566573;
+  --c-light-gray:  #D5D8DC;
+  --c-bg:          #F5F6FA;
+  --c-white:       #FFFFFF;
+  --c-border:      #DDE1E7;
+  --c-table-grid:  #E8EAED;
+  --c-neg-high:    #922B21;
+  --c-neg-med:     #784212;
+  --c-neg-low:     #717D7E;
+  --c-positive:    #1A5276;
+  --hm-high-bg:    #FADBD8;
+  --hm-medh-bg:    #FAE5D3;
+  --hm-low-bg:     #F2F3F4;
+  --hm-pos-bg:     #D6EAF8;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: var(--c-bg); color: var(--c-slate); line-height: 1.5; font-size: 14px; }
+.page-wrapper { max-width: 1400px; margin: 0 auto; padding: 32px 12px 64px; }
+.page-header { margin-bottom: 28px; border-bottom: 3px solid var(--c-navy); padding-bottom: 18px; }
+.page-header h1 { font-size: 22px; font-weight: 700; color: var(--c-navy); letter-spacing: -0.3px; }
+.page-header .subtitle { margin-top: 5px; font-size: 13px; color: var(--c-mid-gray); }
+.section { margin-bottom: 32px; }
+.section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--c-navy); margin-bottom: 10px; border-left: 3px solid var(--c-navy); padding-left: 8px; }
+.summary-box { background: var(--c-white); border: 1px solid var(--c-border); border-left: 4px solid var(--c-navy); border-radius: 4px; padding: 16px 20px; font-size: 14px; color: var(--c-slate); line-height: 1.75; }
+.summary-box p + p { margin-top: 10px; }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.kpi-card { background: var(--c-white); border: 1px solid var(--c-border); border-top: 3px solid var(--c-navy); border-radius: 4px; padding: 16px 18px; }
+.kpi-card .kpi-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--c-mid-gray); margin-bottom: 6px; }
+.kpi-card .kpi-value { font-size: 26px; font-weight: 700; color: var(--c-navy); line-height: 1.1; }
+.kpi-card .kpi-value.negative { color: var(--c-neg-high); }
+.kpi-card .kpi-value.positive { color: var(--c-positive); }
+.kpi-card .kpi-sub { font-size: 11px; color: var(--c-mid-gray); margin-top: 5px; }
+.matrix-wrapper { background: var(--c-white); border: 1px solid var(--c-border); border-radius: 4px; overflow: hidden; }
+.matrix-table { width: 100%; border-collapse: collapse; }
+.matrix-table thead th { background: var(--c-navy); color: var(--c-white); padding: 11px 16px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.7px; text-align: left; }
+.matrix-table thead th:first-child { width: 130px; border-right: 1px solid rgba(255,255,255,0.12); }
+.matrix-table thead th:not(:first-child) { text-align: center; width: calc((100% - 130px) / 3); border-left: 1px solid rgba(255,255,255,0.12); }
+.matrix-table thead th.th-total { background: var(--c-navy-mid); }
+.matrix-table td.channel-label { padding: 10px 16px; font-size: 13px; font-weight: 600; color: var(--c-navy); border-right: 1px solid var(--c-table-grid); vertical-align: middle; white-space: nowrap; background: #F8F9FB; }
+.matrix-table tbody tr { border-bottom: 1px solid var(--c-table-grid); }
+.matrix-table tbody tr:last-child { border-bottom: none; }
+.matrix-table td.matrix-cell { padding: 10px 16px; vertical-align: middle; text-align: center; border-left: 1px solid var(--c-table-grid); background: #F5F6FA; transition: filter 0.1s; }
+.matrix-table td.matrix-cell.ct-high .cell-impact, .matrix-table td.matrix-cell.ct-high .cell-contribution { color: var(--c-neg-high); }
+.matrix-table td.matrix-cell.ct-medh .cell-impact, .matrix-table td.matrix-cell.ct-medh .cell-contribution { color: var(--c-neg-med); }
+.matrix-table td.matrix-cell.ct-low .cell-impact,  .matrix-table td.matrix-cell.ct-low .cell-contribution  { color: var(--c-neg-low); }
+.matrix-table td.matrix-cell.ct-pos .cell-impact,  .matrix-table td.matrix-cell.ct-pos .cell-contribution  { color: var(--c-positive); }
+.matrix-table thead tr { border-bottom: 2px solid rgba(255,255,255,0.18); }
+.cell-impact { font-size: 22px; font-weight: 800; line-height: 1; display: block; margin-bottom: 3px; }
+.cell-impact.cell-empty { font-size: 16px; font-weight: 400; color: #B0B7C0; }
+.cell-contribution { font-size: 11px; font-weight: 600; display: block; opacity: 0.85; }
+.matrix-table td.matrix-cell.cell-total-col { border-left: 2px solid var(--c-table-grid); }
+.matrix-table td.matrix-cell:not(.cell-total-col) .cell-impact { font-weight: 400; }
+.hm-high  { background: var(--hm-high-bg); } .hm-high .cell-impact,  .hm-high .cell-contribution  { color: var(--c-neg-high); }
+.hm-medh  { background: var(--hm-medh-bg); } .hm-medh .cell-impact,  .hm-medh .cell-contribution  { color: var(--c-neg-med); }
+.hm-low   { background: var(--hm-low-bg);  } .hm-low .cell-impact,   .hm-low .cell-contribution   { color: var(--c-neg-low); }
+.hm-pos   { background: var(--hm-pos-bg);  } .hm-pos .cell-impact,   .hm-pos .cell-contribution   { color: var(--c-positive); }
+.treemap-panels { display: flex; gap: 12px; align-items: flex-start; }
+.treemap-panel { flex: 1 1 0; background: var(--c-white); border: 1px solid var(--c-border); border-radius: 4px; overflow: hidden; min-width: 0; }
+.treemap-panel-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; border-bottom: 1px solid var(--c-border); }
+.treemap-panel--neg .treemap-panel-header { background: #FEF2F2; }
+.treemap-panel--pos .treemap-panel-header { background: #EFF6FF; }
+.tp-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; }
+.treemap-panel--neg .tp-label { color: var(--c-neg-high); }
+.treemap-panel--pos .tp-label { color: var(--c-positive); }
+.tp-total { font-size: 13px; font-weight: 700; }
+.treemap-panel--neg .tp-total { color: var(--c-neg-high); }
+.treemap-panel--pos .tp-total { color: var(--c-positive); }
+.treemap-grid { display: flex; flex-wrap: wrap; gap: 5px; padding: 12px; min-height: 100px; }
+.tp-empty { padding: 24px; font-size: 13px; color: var(--c-mid-gray); text-align: center; width: 100%; }
+@media (max-width: 600px) { .treemap-panels { flex-direction: column; } }
+.treemap-block { border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; cursor: default; transition: filter 0.15s; min-width: 72px; min-height: 72px; position: relative; }
+.treemap-block:hover { filter: brightness(0.93); }
+.treemap-block .tb-label { font-size: 10px; font-weight: 600; color: rgba(0,0,0,0.6); line-height: 1.2; margin-bottom: 3px; }
+.treemap-block .tb-impact { font-size: 17px; font-weight: 800; line-height: 1; margin-bottom: 2px; }
+.treemap-block .tb-pct { font-size: 10px; font-weight: 600; opacity: 0.8; }
+.tb-high     { background: #FADBD8; border: 1px solid #F1948A; } .tb-high .tb-impact,     .tb-high .tb-pct     { color: var(--c-neg-high); }
+.tb-med-high { background: #FAE5D3; border: 1px solid #F0B27A; } .tb-med-high .tb-impact, .tb-med-high .tb-pct { color: var(--c-neg-med); }
+.tb-medium   { background: #FEF9E7; border: 1px solid #F7DC6F; } .tb-medium .tb-impact,   .tb-medium .tb-pct   { color: #6E2F0D; }
+.tb-low      { background: var(--hm-low-bg); border: 1px solid var(--c-light-gray); } .tb-low .tb-impact, .tb-low .tb-pct { color: var(--c-neg-low); }
+.tb-positive { background: var(--hm-pos-bg); border: 1px solid #AED6F1; } .tb-positive .tb-impact, .tb-positive .tb-pct { color: var(--c-positive); }
+.table-wrapper { background: var(--c-white); border: 1px solid var(--c-border); border-radius: 4px; overflow: auto; }
+.detail-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.detail-table thead th { background: var(--c-navy); color: var(--c-white); border-bottom: 2px solid rgba(255,255,255,0.12); padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+.detail-table tbody tr { border-bottom: 1px solid var(--c-table-grid); transition: background 0.1s; }
+.detail-table tbody tr:last-child { border-bottom: none; }
+.detail-table tbody tr:hover { background: #EBF5FB; }
+.detail-table td { padding: 9px 14px; color: var(--c-slate); vertical-align: middle; }
+.detail-table td.td-impact.negative { color: var(--c-neg-high); font-weight: 700; }
+.detail-table td.td-impact.positive { color: var(--c-positive); font-weight: 700; }
+.detail-table td.td-note { color: var(--c-mid-gray); font-size: 12px; max-width: 260px; }
+.detail-table thead th[data-col] { cursor: pointer; user-select: none; white-space: nowrap; }
+.detail-table thead th[data-col]:hover { background: #1A3A5C; }
+.detail-table thead th.sort-active { background: #1A3A5C; }
+.detail-table thead th[data-col]::after { content: ''; display: inline-block; width: 14px; text-align: center; opacity: 0.35; font-size: 9px; vertical-align: middle; margin-left: 3px; }
+.detail-table thead th[data-col]:hover::after { content: '↕'; opacity: 0.6; }
+.detail-table thead th.sort-desc::after { content: '▼'; opacity: 1; }
+.detail-table thead th.sort-asc::after  { content: '▲'; opacity: 1; }
+.methodology-box { background: var(--c-white); border: 1px solid var(--c-border); border-radius: 4px; padding: 20px 24px; font-size: 13px; color: var(--c-slate); line-height: 1.75; }
+.methodology-box h3 { font-size: 14px; font-weight: 700; margin-bottom: 10px; color: var(--c-navy); }
+.methodology-box p + p { margin-top: 8px; }
+.disclaimer-box { background: #F8F9FA; border: 1px solid var(--c-border); border-radius: 4px; padding: 12px 16px; font-size: 12px; color: var(--c-mid-gray); font-style: italic; }
+.loading-msg { padding: 40px; text-align: center; color: var(--c-mid-gray); font-size: 14px; }
+.error-msg { padding: 24px; background: var(--hm-high-bg); border: 1px solid #F1948A; border-radius: 4px; color: var(--c-neg-high); font-size: 13px; }
+@media (max-width: 720px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } .page-wrapper { padding: 20px 8px 40px; } }
+  </style>
+</head>
+<body>
+
+<div class="page-wrapper">
+
+  <div id="loading" class="loading-msg">Loading dashboard data…</div>
+
+  <div id="dashboard" style="display:none;">
+
+    <header class="page-header">
+      <h1>Product Margin Rate Variance Dashboard</h1>
+      <p class="subtitle">Period-over-period decomposition &mdash; Mix Effect, Volume Effect &amp; Rate Effect &nbsp;|&nbsp; Synthetic data for portfolio demonstration</p>
+    </header>
+
+    <section class="section">
+      <div class="section-title">Executive Summary</div>
+      <div class="summary-box"><div id="exec-summary"></div></div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">Key Metrics</div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Previous Margin Rate</div><div class="kpi-value" id="kpi-prev">—</div><div class="kpi-sub">Q1 2024</div></div>
+        <div class="kpi-card"><div class="kpi-label">Current Margin Rate</div><div class="kpi-value" id="kpi-curr">—</div><div class="kpi-sub">Q2 2024</div></div>
+        <div class="kpi-card"><div class="kpi-label">Change</div><div class="kpi-value" id="kpi-change">—</div><div class="kpi-sub">Percentage points QoQ</div></div>
+        <div class="kpi-card"><div class="kpi-label">Top Driver</div><div class="kpi-value" style="font-size:15px;line-height:1.3;" id="kpi-top-driver">—</div><div class="kpi-sub">Largest single contributor</div></div>
+        <div class="kpi-card"><div class="kpi-label">Top Driver Impact</div><div class="kpi-value" id="kpi-top-impact">—</div><div class="kpi-sub">Absolute pts contribution</div></div>
+        <div class="kpi-card"><div class="kpi-label">Top Driver Share</div><div class="kpi-value" id="kpi-top-contrib">—</div><div class="kpi-sub">% of total variance</div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">Driver Treemap &mdash; Block size = absolute impact</div>
+      <div class="treemap-panels">
+        <div class="treemap-panel treemap-panel--pos">
+          <div class="treemap-panel-header"><span class="tp-label">Positive Drivers</span><span class="tp-total" id="treemap-pos-total"></span></div>
+          <div id="treemap-pos" class="treemap-grid"></div>
+        </div>
+        <div class="treemap-panel treemap-panel--neg">
+          <div class="treemap-panel-header"><span class="tp-label">Negative Drivers</span><span class="tp-total" id="treemap-neg-total"></span></div>
+          <div id="treemap-neg" class="treemap-grid"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">5&times;3 Impact Matrix &mdash; Product &times; Factor Decomposition</div>
+      <div class="matrix-wrapper">
+        <table class="matrix-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Volume Effect</th>
+              <th>Rate Effect</th>
+              <th>Mix Effect</th>
+              <th class="th-total">Product Total</th>
+            </tr>
+          </thead>
+          <tbody id="matrix-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">Detail Table</div>
+      <div class="table-wrapper">
+        <table class="detail-table">
+          <thead>
+            <tr>
+              <th data-col="channel">Product</th>
+              <th data-col="factor">Factor</th>
+              <th data-col="metric_change_label">Metric Change</th>
+              <th data-col="impact_pts">Impact (pts)</th>
+              <th data-col="contribution_pct">Contribution</th>
+              <th data-col="previous_pay_count">Prev Volume</th>
+              <th data-col="current_pay_count">Curr Volume</th>
+              <th data-col="previous_success_rate">Prev Rate</th>
+              <th data-col="current_success_rate">Curr Rate</th>
+              <th data-col="note">Note</th>
+            </tr>
+          </thead>
+          <tbody id="detail-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="methodology-box">
+        <h3>Methodology</h3>
+        <p>This dashboard decomposes the period-over-period movement in overall product margin rate into three category-level effects: <strong>Mix Effect</strong>, <strong>Volume Effect</strong>, and <strong>Rate Effect</strong>.</p>
+        <p><strong>Mix Effect</strong> captures how changes in each product category's <em>proportional share</em> of total sales volume affect the weighted-average margin rate.</p>
+        <p><strong>Volume Effect</strong> captures how changes in the <em>absolute sales volume</em> within each category affect the overall margin rate, independent of its share change.</p>
+        <p><strong>Rate Effect</strong> captures how changes in each category's own margin rate affect the overall weighted average.</p>
+        <p>Impact values are expressed in percentage points. A positive impact indicates the driver lifted the weighted-average rate; a negative impact indicates it dragged the rate down.</p>
+        <p class="methodology-note">This framework is domain-agnostic: the same Mix / Volume / Rate decomposition applies equally to payment success rate, churn rate, conversion rate, or any weighted-average rate metric.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="disclaimer-box">
+        This dashboard uses synthetic data for portfolio demonstration purposes.
+        It does not represent any real company, real product category, or internal business data.
+        Domain originally demonstrated on payment success rate variance; refactored as a reusable variance framework.
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+// ─── Inline data (replaces Spring Boot API calls) ────────────────────────────
+const STATIC_ROWS = [
+  { channel: 'Product A', factor: 'Volume Effect', metric_change_label: '+10,000 units', impact_pts: 1.2,  contribution_pct: 10.0, previous_pay_count: 40000, current_pay_count: 50000, previous_success_rate: 0.450, current_success_rate: 0.500, note: 'Volume growth in a high-margin product amplified its positive weight in the portfolio' },
+  { channel: 'Product A', factor: 'Mix Effect',    metric_change_label: '+3.5% share',   impact_pts: 0.8,  contribution_pct: 6.7,  previous_pay_count: 40000, current_pay_count: 50000, previous_success_rate: 0.450, current_success_rate: 0.500, note: 'Rising proportional share of the top-performing product lifted the weighted average' },
+  { channel: 'Product A', factor: 'Rate Effect',   metric_change_label: '+5.0% margin',  impact_pts: 2.5,  contribution_pct: 20.8, previous_pay_count: 40000, current_pay_count: 50000, previous_success_rate: 0.450, current_success_rate: 0.500, note: 'Premium pricing and efficiency gains drove the strongest margin improvement across the portfolio' },
+  { channel: 'Product B', factor: 'Volume Effect', metric_change_label: '-3,000 units',  impact_pts: -0.3, contribution_pct: 2.5,  previous_pay_count: 25000, current_pay_count: 22000, previous_success_rate: 0.400, current_success_rate: 0.430, note: 'Reduced volume in a mid-tier product slightly softened its weight in the portfolio' },
+  { channel: 'Product B', factor: 'Mix Effect',    metric_change_label: '-2.2% share',   impact_pts: -0.5, contribution_pct: 4.2,  previous_pay_count: 25000, current_pay_count: 22000, previous_success_rate: 0.400, current_success_rate: 0.430, note: 'Smaller proportional share of a below-average product created a modest mix headwind' },
+  { channel: 'Product B', factor: 'Rate Effect',   metric_change_label: '+3.0% margin',  impact_pts: 0.9,  contribution_pct: 7.5,  previous_pay_count: 25000, current_pay_count: 22000, previous_success_rate: 0.400, current_success_rate: 0.430, note: 'Pricing optimisation partially recovered margin despite volume pressure' },
+  { channel: 'Product C', factor: 'Volume Effect', metric_change_label: '+3,000 units',  impact_pts: 0.4,  contribution_pct: 3.3,  previous_pay_count: 20000, current_pay_count: 23000, previous_success_rate: 0.380, current_success_rate: 0.370, note: 'Modest volume expansion in an average-margin product added incremental positive weight' },
+  { channel: 'Product C', factor: 'Mix Effect',    metric_change_label: '+1.8% share',   impact_pts: 0.3,  contribution_pct: 2.5,  previous_pay_count: 20000, current_pay_count: 23000, previous_success_rate: 0.380, current_success_rate: 0.370, note: 'Higher share of a mid-margin product provided mild mix support' },
+  { channel: 'Product C', factor: 'Rate Effect',   metric_change_label: '-1.0% margin',  impact_pts: -0.8, contribution_pct: 6.7,  previous_pay_count: 20000, current_pay_count: 23000, previous_success_rate: 0.380, current_success_rate: 0.370, note: 'Supply chain cost increases compressed margin and partially offset volume gains' },
+  { channel: 'Product D', factor: 'Volume Effect', metric_change_label: '+5,000 units',  impact_pts: 0.6,  contribution_pct: 5.0,  previous_pay_count: 18000, current_pay_count: 23000, previous_success_rate: 0.350, current_success_rate: 0.390, note: 'Solid volume growth in a recovering product increased its contribution to the portfolio' },
+  { channel: 'Product D', factor: 'Mix Effect',    metric_change_label: '+2.5% share',   impact_pts: 0.7,  contribution_pct: 5.8,  previous_pay_count: 18000, current_pay_count: 23000, previous_success_rate: 0.350, current_success_rate: 0.390, note: 'Expanding share of an improving product supported the overall margin lift' },
+  { channel: 'Product D', factor: 'Rate Effect',   metric_change_label: '+4.0% margin',  impact_pts: 1.1,  contribution_pct: 9.2,  previous_pay_count: 18000, current_pay_count: 23000, previous_success_rate: 0.350, current_success_rate: 0.390, note: 'Cost reduction initiatives and improved supplier terms drove meaningful margin recovery' },
+  { channel: 'Product E', factor: 'Volume Effect', metric_change_label: '-3,000 units',  impact_pts: -0.4, contribution_pct: 3.3,  previous_pay_count: 22000, current_pay_count: 19000, previous_success_rate: 0.480, current_success_rate: 0.450, note: 'Declining volume in a formerly strong product reduced its positive contribution to the portfolio' },
+  { channel: 'Product E', factor: 'Mix Effect',    metric_change_label: '-1.8% share',   impact_pts: -0.6, contribution_pct: 5.0,  previous_pay_count: 22000, current_pay_count: 19000, previous_success_rate: 0.480, current_success_rate: 0.450, note: 'Shrinking share of a previously high-margin product created meaningful mix drag' },
+  { channel: 'Product E', factor: 'Rate Effect',   metric_change_label: '-3.0% margin',  impact_pts: -0.9, contribution_pct: 7.5,  previous_pay_count: 22000, current_pay_count: 19000, previous_success_rate: 0.480, current_success_rate: 0.450, note: 'Margin compression from competitive discounting eroded the product\'s rate advantage' },
+];
+
+const STATIC_SUMMARY = {
+  prevRate:    0.420,
+  currRate:    0.375,
+  totalChange: -0.045,
+  prevPeriod:  'Q1 2024',
+  currPeriod:  'Q2 2024',
+};
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let SEGMENTS = [];
+const FACTORS = ['Volume Effect', 'Rate Effect', 'Mix Effect'];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function fmtPts(v)   { return (v >= 0 ? '+' : '') + v.toFixed(2) + ' pts'; }
+function fmtRate(v)  { return (v * 100).toFixed(1) + '%'; }
+function fmtCount(v) { return Number(v).toLocaleString(); }
+
+function findTopDriver(data) {
+  return data.reduce((top, row) =>
+    Math.abs(row.impact_pts) > Math.abs(top.impact_pts) ? row : top, data[0]);
+}
+
+// ─── Render KPI Cards ────────────────────────────────────────────────────────
+function renderKPI(data, summary) {
+  const top = findTopDriver(data);
+  const prevRatePct    = (summary.prevRate  * 100).toFixed(1) + '%';
+  const currRatePct    = (summary.currRate  * 100).toFixed(1) + '%';
+  const totalChangePts = parseFloat((summary.totalChange * 100).toFixed(2));
+
+  document.getElementById('kpi-prev').textContent = prevRatePct;
+  document.getElementById('kpi-curr').textContent = currRatePct;
+
+  const changeEl = document.getElementById('kpi-change');
+  changeEl.textContent = fmtPts(totalChangePts);
+  changeEl.classList.toggle('positive', totalChangePts >= 0);
+  changeEl.classList.toggle('negative', totalChangePts < 0);
+
+  document.getElementById('kpi-top-driver').textContent = `${top.channel} / ${top.factor}`;
+
+  const impactEl = document.getElementById('kpi-top-impact');
+  impactEl.textContent = fmtPts(top.impact_pts);
+  impactEl.classList.toggle('positive', top.impact_pts >= 0);
+  impactEl.classList.toggle('negative', top.impact_pts < 0);
+
+  const contribEl = document.getElementById('kpi-top-contrib');
+  contribEl.textContent = Math.abs(top.contribution_pct) + '%';
+  contribEl.classList.toggle('positive', top.impact_pts >= 0);
+  contribEl.classList.toggle('negative', top.impact_pts < 0);
+}
+
+// ─── Render Impact Matrix ────────────────────────────────────────────────────
+function renderMatrix(data) {
+  const lookup = {};
+  data.forEach(row => { lookup[`${row.channel}|${row.factor}`] = row; });
+
+  const channelTotal = {};
+  SEGMENTS.forEach(channel => {
+    let totalPts = 0, totalPct = 0;
+    FACTORS.forEach(factor => {
+      const row = lookup[`${channel}|${factor}`];
+      if (row) { totalPts += row.impact_pts; totalPct += parseFloat(row.contribution_pct); }
+    });
+    channelTotal[channel] = { pts: parseFloat(totalPts.toFixed(2)), pct: parseFloat(totalPct.toFixed(1)) };
+  });
+
+  const rowMax = {};
+  SEGMENTS.forEach(channel => {
+    let best = null;
+    FACTORS.forEach(factor => {
+      const row = lookup[`${channel}|${factor}`];
+      if (!row) return;
+      if (best === null || Math.abs(row.impact_pts) > Math.abs(lookup[`${channel}|${best}`].impact_pts)) best = factor;
+    });
+    rowMax[channel] = best;
+  });
+
+  const colMax = {};
+  FACTORS.forEach(factor => {
+    let best = null;
+    SEGMENTS.forEach(channel => {
+      const row = lookup[`${channel}|${factor}`];
+      if (!row) return;
+      if (best === null || Math.abs(row.impact_pts) > Math.abs(lookup[`${best}|${factor}`].impact_pts)) best = channel;
+    });
+    colMax[factor] = best;
+  });
+
+  let totalColMaxChannel = null;
+  SEGMENTS.forEach(channel => {
+    if (totalColMaxChannel === null || Math.abs(channelTotal[channel].pts) > Math.abs(channelTotal[totalColMaxChannel].pts))
+      totalColMaxChannel = channel;
+  });
+
+  function hmClass(pts) {
+    if (pts > 0) return 'hm-pos';
+    const a = Math.abs(pts);
+    if (a >= 1.5) return 'hm-high';
+    if (a >= 0.7) return 'hm-medh';
+    return 'hm-low';
+  }
+  function cellTextClass(pts) {
+    if (pts > 0) return 'ct-pos';
+    const a = Math.abs(pts);
+    if (a >= 1.5) return 'ct-high';
+    if (a >= 0.7) return 'ct-medh';
+    return 'ct-low';
+  }
+
+  const tbody = document.getElementById('matrix-tbody');
+  tbody.innerHTML = '';
+  SEGMENTS.forEach(channel => {
+    const tr = document.createElement('tr');
+    const tdLabel = document.createElement('td');
+    tdLabel.className = 'channel-label';
+    tdLabel.textContent = channel;
+    tr.appendChild(tdLabel);
+
+    FACTORS.forEach(factor => {
+      const row    = lookup[`${channel}|${factor}`];
+      const td     = document.createElement('td');
+      const txtCls = row ? cellTextClass(row.impact_pts) : '';
+      td.className = `matrix-cell${txtCls ? ' ' + txtCls : ''}${rowMax[channel] === factor ? ' is-row-max' : ''}${colMax[factor] === channel ? ' is-col-max' : ''}`;
+      td.innerHTML = row
+        ? `<span class="cell-impact">${fmtPts(row.impact_pts)}</span><span class="cell-contribution">${Math.abs(row.contribution_pct)}% of total</span>`
+        : `<span class="cell-impact cell-empty">—</span>`;
+      tr.appendChild(td);
+    });
+
+    const tot = channelTotal[channel];
+    const tdTotal = document.createElement('td');
+    tdTotal.className = `matrix-cell cell-total-col ${hmClass(tot.pts)}${totalColMaxChannel === channel ? ' is-col-max' : ''}`;
+    tdTotal.innerHTML = `<span class="cell-impact">${fmtPts(tot.pts)}</span><span class="cell-contribution">${Math.abs(tot.pct)}% of total</span>`;
+    tr.appendChild(tdTotal);
+    tbody.appendChild(tr);
+  });
+}
+
+// ─── Render Treemap ──────────────────────────────────────────────────────────
+function renderTreemap(data) {
+  const negData  = data.filter(r => r.impact_pts < 0).sort((a, b) => a.impact_pts - b.impact_pts);
+  const posData  = data.filter(r => r.impact_pts > 0).sort((a, b) => b.impact_pts - a.impact_pts);
+  const totalAbs = data.reduce((s, r) => s + Math.abs(r.impact_pts), 0);
+
+  document.getElementById('treemap-neg-total').textContent = fmtPts(parseFloat(negData.reduce((s, r) => s + r.impact_pts, 0).toFixed(2)));
+  document.getElementById('treemap-pos-total').textContent = fmtPts(parseFloat(posData.reduce((s, r) => s + r.impact_pts, 0).toFixed(2)));
+
+  function colorClass(pts) {
+    if (pts > 0) return 'tb-positive';
+    const a = Math.abs(pts);
+    if (a >= 1.5) return 'tb-high';
+    if (a >= 0.7) return 'tb-med-high';
+    if (a >= 0.3) return 'tb-medium';
+    return 'tb-low';
+  }
+
+  function renderBlocks(rows, containerId) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    if (!rows.length) { container.innerHTML = '<div class="tp-empty">No drivers in this group.</div>'; return; }
+    rows.forEach(row => {
+      const share = Math.abs(row.impact_pts) / totalAbs;
+      const size  = Math.max(72, Math.round(share * 960));
+      const block = document.createElement('div');
+      block.className = 'treemap-block ' + colorClass(row.impact_pts);
+      block.style.width = block.style.height = size + 'px';
+      block.title = `${row.channel} / ${row.factor}\n${fmtPts(row.impact_pts)} (${Math.abs(row.contribution_pct)}%)\n${row.note}`;
+      const short = { 'Mix Effect': 'Mix', 'Volume Effect': 'Volume', 'Rate Effect': 'Rate' };
+      block.innerHTML = `${size >= 100 ? `<div class="tb-label">${row.channel}<br>${short[row.factor] || row.factor}</div>` : ''}
+        <div class="tb-impact">${fmtPts(row.impact_pts)}</div>
+        <div class="tb-pct">${Math.abs(row.contribution_pct)}%</div>`;
+      container.appendChild(block);
+    });
+  }
+
+  renderBlocks(negData, 'treemap-neg');
+  renderBlocks(posData, 'treemap-pos');
+}
+
+// ─── Detail Table ─────────────────────────────────────────────────────────────
+let tableData = [];
+let tableSort = { col: 'impact_pts', dir: 'desc', abs: true };
+
+function getSortedTableData() {
+  return [...tableData].sort((a, b) => {
+    const { col, dir, abs } = tableSort;
+    let va = a[col], vb = b[col];
+    if (abs) return Math.abs(vb) - Math.abs(va);
+    if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+    return dir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0);
+  });
+}
+
+function updateTableSortHeaders() {
+  document.querySelectorAll('.detail-table thead th[data-col]').forEach(th => {
+    th.classList.remove('sort-active', 'sort-asc', 'sort-desc');
+    if (th.dataset.col === tableSort.col) {
+      th.classList.add('sort-active', tableSort.abs || tableSort.dir === 'desc' ? 'sort-desc' : 'sort-asc');
+    }
+  });
+}
+
+function renderTableRows(rows) {
+  const tbody = document.getElementById('detail-tbody');
+  tbody.innerHTML = '';
+  rows.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${row.channel}</td>
+      <td>${row.factor}</td>
+      <td>${row.metric_change_label}</td>
+      <td class="td-impact ${row.impact_pts < 0 ? 'negative' : 'positive'}">${fmtPts(row.impact_pts)}</td>
+      <td>${row.contribution_pct}%</td>
+      <td>${fmtCount(row.previous_pay_count)}</td>
+      <td>${fmtCount(row.current_pay_count)}</td>
+      <td>${fmtRate(row.previous_success_rate)}</td>
+      <td>${fmtRate(row.current_success_rate)}</td>
+      <td class="td-note">${row.note}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function redrawTable() { renderTableRows(getSortedTableData()); updateTableSortHeaders(); }
+
+function initTableSort() {
+  document.querySelectorAll('.detail-table thead th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (col === tableSort.col) {
+        tableSort.abs ? (tableSort.abs = false, tableSort.dir = 'desc') : (tableSort.dir = tableSort.dir === 'asc' ? 'desc' : 'asc');
+      } else {
+        tableSort = { col, dir: 'desc', abs: false };
+      }
+      redrawTable();
+    });
+  });
+}
+
+// ─── Executive Summary ────────────────────────────────────────────────────────
+function renderSummary(data, summary) {
+  const sorted = [...data].sort((a, b) => Math.abs(b.impact_pts) - Math.abs(a.impact_pts));
+  const top = sorted[0], second = sorted[1];
+  const prevRatePct    = (summary.prevRate  * 100).toFixed(1) + '%';
+  const currRatePct    = (summary.currRate  * 100).toFixed(1) + '%';
+  const totalChangePts = parseFloat((summary.totalChange * 100).toFixed(2));
+  const isPositive  = totalChangePts >= 0;
+  const direction   = isPositive ? 'improved' : 'declined';
+  const changeColor = isPositive ? '#1A5276' : '#DC2626';
+  const changeWord  = isPositive ? 'improvement' : 'decline';
+  const suffix = second.factor === 'Rate Effect'
+    ? `product-level rate ${isPositive ? 'improvement' : 'deterioration'} extended beyond the top driver`
+    : second.factor === 'Mix Effect'
+      ? `product mix shifted structurally toward ${isPositive ? 'higher' : 'lower'}-margin products`
+      : `absolute volume growth was concentrated in ${isPositive ? 'stronger' : 'weaker'}-margin products`;
+
+  document.getElementById('exec-summary').innerHTML = `
+    <p>Overall product margin rate ${direction} from <strong>${prevRatePct}</strong> to
+    <strong>${currRatePct}</strong>, a <strong style="color:${changeColor}">${fmtPts(totalChangePts)}</strong>
+    period-over-period change (${summary.prevPeriod} → ${summary.currPeriod}).</p>
+    <p>The largest contributor was <strong>${top.channel} / ${top.factor}</strong>,
+    contributing <strong style="color:${changeColor}">${fmtPts(top.impact_pts)}</strong>
+    (${Math.abs(top.contribution_pct)}% of the total ${changeWord}).
+    The second largest contributor was <strong>${second.channel} / ${second.factor}</strong>
+    at <strong>${fmtPts(second.impact_pts)}</strong> (${Math.abs(second.contribution_pct)}%),
+    indicating that ${suffix}.</p>
+    <p>This suggests the margin ${changeWord} was driven by a combination of product-level rate
+    ${isPositive ? 'gains' : 'compression'}, ${isPositive ? 'favorable' : 'unfavorable'} product mix shift,
+    and volume concentration in ${isPositive ? 'higher' : 'lower'}-margin segments.</p>`;
+}
+
+// ─── Bootstrap ───────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const data = STATIC_ROWS;
+
+  const seen = new Set();
+  data.forEach(r => { if (!seen.has(r.channel)) { seen.add(r.channel); SEGMENTS.push(r.channel); } });
+
+  renderSummary(data, STATIC_SUMMARY);
+  renderKPI(data, STATIC_SUMMARY);
+  renderMatrix(data);
+  renderTreemap(data);
+  tableData = data;
+  redrawTable();
+  initTableSort();
+
+  document.getElementById('loading').style.display   = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+});
+</script>
+</body>
+</html>
